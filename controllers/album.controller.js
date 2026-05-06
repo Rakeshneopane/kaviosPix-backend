@@ -38,7 +38,7 @@ const updateAlbum = router.patch("/:id", async(req,res,next)=>{
         const { id } = req.params;
         const ownerId = req.user._id; 
         
-        const { name, description, ownerId, sharedUserIds } = req.body;
+        const { name, description, sharedUserIds } = req.body;
         if(!name || !id){
             throw createError("Name or ownerId are required.", 400);
         }
