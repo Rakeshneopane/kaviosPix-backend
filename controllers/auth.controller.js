@@ -62,7 +62,7 @@ router.get("/auth/google/callback", async(req,res)=>{
 
             const jwtToken = jwt.sign(
                 {_id}, 
-                process.env.SECRET_KEY, 
+                process.env.JWT_SECRET_KEY, 
                 {expiresIn: '1h'}
             );
 
