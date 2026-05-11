@@ -19,7 +19,7 @@ const ImageSchema = new mongoose.Schema({
         type: [String],
         default: [],
     },
-    isfavorite: {
+    isFavorite: {
         type: Boolean,
         default: false,
     },
@@ -30,6 +30,9 @@ const ImageSchema = new mongoose.Schema({
     size: {
         type: Number,
         required: true,
+    },
+    url:{
+        type: String,
     }
 },{
     timestamps: true

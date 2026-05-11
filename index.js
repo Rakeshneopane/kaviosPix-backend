@@ -5,6 +5,7 @@ require("dotenv").config();
 const { initializeDB } = require("./db.Connection/db.connect");
 const { errorHandler } = require("./middleware/errorHandler");
 const { albumRouter } = require("./routes/album.route");
+const { imageRouter } = require("./routes/image.route");
 
 const router = require("./controllers/auth.controller");
 
@@ -22,6 +23,7 @@ app.get("/", (req,res)=>{
 app.use("/auth", router);
 
 app.use("/album", albumRouter);
+app.use("/image", imageRouter);
 
 app.use(errorHandler);
 

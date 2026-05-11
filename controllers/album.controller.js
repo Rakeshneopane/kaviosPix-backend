@@ -1,17 +1,18 @@
 const express = require("express");
 const { createError } = require("../utils/createError");
 const { AlbumModel } = require("../models/album.model");
-const router = express.Router();
+const { ImageModel } =  require("../models/image.model");
+
 const joi = require("joi");
 
 const ablumSchemaVerify = joi.object({
     name: joi.string().min(3).max(30).required(),
     description: joi.string(),
-    ownerId: joi.string().alphanum().required(),
+    ownerId: joi.string().required(),
     sharedUserIds: [joi.string().alphanum()]
 });
 
-const createAlbum = router.post("/create", async(req, res, next)=>{
+const createAlbum = async(req, res, next)=>{
     try {
         const {name, description, sharedUserIds} = req.body;
         // taking from middleware from  
@@ -31,9 +32,9 @@ const createAlbum = router.post("/create", async(req, res, next)=>{
     } catch (error) {
         next(error);   
     }
-});
+};
 
-const updateAlbum = router.patch("/:id", async(req,res,next)=>{
+const updateAlbum = async(req,res,next)=>{
     try {
         const { id } = req.params;
         const ownerId = req.user._id; 
@@ -56,24 +57,25 @@ const updateAlbum = router.patch("/:id", async(req,res,next)=>{
     } catch (error) {
         next(error);    
     }
-});
+};
 
-const deleteAlbum = router.delete("/:id", async(req,res,next)=>{
-    
+const deleteAlbum = async(req,res,next)=>{
     try {
         const {id} = req.params;
-        
+        const allImages =  await ImageModel.deleteMany({albumId: id });
         const deletedAlbum = await AlbumModel.findByIdAndDelete(id);
-        if(!deletedAlbum) {
-            throw createError("Server Error: Deletion failed.",500);
+
+        if(!deletedAlbum ) {
+            throw createError("Server Error: Album Deletion failed.",500);
         }
+        
         return res.status(200).json({message: "Album deleted successffully", album: deletedAlbum});
     } catch (error) {
        next(error);
     }
-})
+};
 
-const getAlbums = router.get("/all", async(req,res, next)=>{
+const getAlbums = async(req,res, next)=>{
     const page = parseInt(req.query.page) ?? 1;
     const limit = parseInt(req.query.limit) ?? 5;
     const skip = (page - 1) * limit;
@@ -95,8 +97,9 @@ const getAlbums = router.get("/all", async(req,res, next)=>{
     } catch (error) {
         next(error);
     }
-})
-const getParticularAlbum = router.get("/:id", async(req,res, next)=>{
+};
+
+const getParticularAlbum = async(req,res, next)=>{
     const {id} = req.params;
     try {
         const albumData = await AlbumModel.findById(id);
@@ -110,6 +113,25 @@ const getParticularAlbum = router.get("/:id", async(req,res, next)=>{
     } catch (error) {
         next(error)
     }
-});
+};
 
-module.exports = {createAlbum, updateAlbum, deleteAlbum, getAlbums, getParticularAlbum };
+const shareAblums = async(req, res, next)=>{
+    try {
+        const {id} = req.params;
+        const findAlbum = await AlbumModel.findById(id);
+        if(!findAlbum) {
+            throw createError("Album not found in the DB.",404);
+        }
+        // array from frontend
+        const sharedId = req.body.sharedId;
+        const sharedAblum = await AlbumModel.findByIdAndUpdate(id, {$set: {sharedUserIds: sharedId}}, {new: true})
+        return res.status(200).json({
+            message: "Shared the ablum successfully",
+            album: sharedAblum
+        })
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { createAlbum, updateAlbum, deleteAlbum, getAlbums, getParticularAlbum, shareAblums };
