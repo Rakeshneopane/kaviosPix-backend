@@ -4,8 +4,11 @@ const axios = require("axios");
 const { createError } = require("../utils/createError");
 
 const { UserModel } = require("../models/user.model");
+const { verifyMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
+
+const isProduction = process.env.NODE_ENV === "production";
 
 router.get("/google", (req,res, next)=>{
     try {
@@ -18,6 +21,7 @@ router.get("/google", (req,res, next)=>{
 });
 
 router.get("/google/callback", async(req,res, next)=>{
+     console.log("FRONTEND_URL:", process.env.FRONTEND_URL); 
     try {
         const {code} = req.query;
         if(!code) throw createError("Authorization is not provided.",400);
@@ -34,11 +38,11 @@ router.get("/google/callback", async(req,res, next)=>{
 
         const accessToken = tokenResponse.data.access_token;
 
-        res.cookie("access_token", accessToken, {
-            httpOnly: true,
-            secure: true,
-            sameSite: "strict"
-        });
+        // res.cookie("access_token", accessToken, {
+        //     httpOnly: true,
+        //     secure: true,
+        //     sameSite: "strict"
+        // });
 
 
         const userInfo = await axios.get("https://www.googleapis.com/oauth2/v2/userinfo",
@@ -51,10 +55,11 @@ router.get("/google/callback", async(req,res, next)=>{
 
         const filter = {email};
         const update = {$set : {name}};
-        const existingUser = await UserModel.findOneAndUpdate( filter, update, {
-            new: true,
-            upsert: true,
-        });
+        const existingUser = await UserModel.findOneAndUpdate( 
+            filter, 
+            update, 
+            { new: true, upsert: true }
+        );
 
         const {_id} = existingUser;
 
@@ -66,13 +71,24 @@ router.get("/google/callback", async(req,res, next)=>{
 
         res.cookie("jwt_token", jwtToken,{
             httpOnly: true,
-            secure: true,
-            sameSite: "strict"
+            secure: isProduction,
+            sameSite: isProduction? "strict" : "lax",
         })
         return res.redirect(`${process.env.FRONTEND_URL}/v1/profile/google`);       
     } catch (error) {
         next(error);
     }
 });
+
+router.get("/me", verifyMiddleware, async(req,res,next)=>{
+    try {
+        const user = await UserModel.findById(req.user._id).select("-password");
+        if(!user) throw createError("User not found.", 404);
+
+        return res.json({user});
+    } catch (error) {
+        next(error);
+    }
+})
 
 module.exports = router;

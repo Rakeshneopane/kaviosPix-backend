@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const cookieParser = require("cookie-parser");
 
 const { initializeDB } = require("./db.Connection/db.connect");
 const { errorHandler } = require("./middleware/errorHandler");
@@ -12,8 +13,12 @@ const router = require("./controllers/auth.controller");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(cors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+}));
 app.use(express.json());
+app.use(cookieParser());
 initializeDB();
 
 app.get("/", (req,res)=>{
