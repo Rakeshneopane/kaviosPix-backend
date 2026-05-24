@@ -9,26 +9,26 @@ const imageRouter = express.Router();
 //to uplaod images
 imageRouter.post("/upload", verifyMiddleware, upload.array("uploaded-image", 15), imageUpload);
 
-// albumId se favorites
+// albumId se favorites done
 imageRouter.get("/:albumId/images/favorites", verifyMiddleware, getFavorites);
 
-// albumId se filter by tag
+// albumId se filter by tag done
 imageRouter.get("/:albumId/images/filter", verifyMiddleware, imageFilter);
 
-// albumId se saari images
+// albumId se saari images done
 imageRouter.get("/:albumId/images", verifyMiddleware, getImages);
 
 
-// specific image
+// specific image done
 imageRouter.get("/:imageId", verifyMiddleware, getParticularImage);
 
-// toggle favorite
+// toggle favorite done
 imageRouter.put("/:imageId/toggle", verifyMiddleware, toggleFavorite);
 
 // add comment
-imageRouter.post("/:imageId/comment", verifyMiddleware, addComment);
+imageRouter.patch("/:imageId/comment", verifyMiddleware, addComment);
 
-// delete image
+// delete image done
 imageRouter.delete("/:imageId", verifyMiddleware, deleteImages);
 
 

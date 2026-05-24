@@ -73,6 +73,7 @@ router.get("/google/callback", async(req,res, next)=>{
             httpOnly: true,
             secure: isProduction,
             sameSite: isProduction? "strict" : "lax",
+            maxAge: 60*60*1000
         })
         return res.redirect(`${process.env.FRONTEND_URL}/v1/profile/google`);       
     } catch (error) {
@@ -85,10 +86,23 @@ router.get("/me", verifyMiddleware, async(req,res,next)=>{
         const user = await UserModel.findById(req.user._id).select("-password");
         if(!user) throw createError("User not found.", 404);
 
-        return res.json({user});
+        return res.status(200).json({message: "user found sucessfully", user});
     } catch (error) {
         next(error);
     }
 })
 
+router.post("/logout", verifyMiddleware, async(req,res,next)=>{
+    try {
+        res.clearCookie("jwt_token", {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction? "strict" : "lax",
+        });
+
+        return res.json({message: " Logout successful "});
+    } catch (error) {
+        next(error);
+    }
+})
 module.exports = router;

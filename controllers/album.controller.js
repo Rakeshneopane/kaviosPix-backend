@@ -108,7 +108,7 @@ const getParticularAlbum = async(req,res, next)=>{
         }
         return res.status(200).json({
             message: "Fetched the ablums sucessfully",
-            albums: albumData
+            album: albumData
         });
     } catch (error) {
         next(error)
