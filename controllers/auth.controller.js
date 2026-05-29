@@ -4,6 +4,7 @@ const axios = require("axios");
 const { createError } = require("../utils/createError");
 
 const { UserModel } = require("../models/user.model");
+const { AlbumModel } = require("../models/album.model");
 const { verifyMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
@@ -91,7 +92,14 @@ router.get("/me", verifyMiddleware, async(req,res,next)=>{
         next(error);
     }
 })
-
+// router.get("/initialise", verifyMiddleware, async(req,res,next)=>{
+//     try {
+//         const user = req.user.email;
+//         const existingUser = await UserModel.find({})
+//     } catch (error) {
+//         next(error);
+//     }
+// })
 router.post("/logout", verifyMiddleware, async(req,res,next)=>{
     try {
         res.clearCookie("jwt_token", {
