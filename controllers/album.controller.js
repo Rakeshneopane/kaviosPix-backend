@@ -122,7 +122,7 @@ const getAlbums = async(req,res, next)=>{
 
         if(albums.length === 0) {
             const defaultAlbum = await AlbumModel.create({
-                name: "default Album",
+                name: "default", // changed from default Album
                 description: "none",
                 ownerId,
                 sharedUserIds: [],

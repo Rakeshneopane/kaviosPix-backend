@@ -7,22 +7,38 @@ const path = require("path");
 
 const { cloudinary } = require("../utils/uploadExport");
 
+// joi array checks and added url required
 const imageSchemaValidate = joi.object({
     albumId: joi.string().required(),
-    name: joi.string().min(3).max(30).required(),
-    tags: [joi.string()],
-    person: [joi.string()],
-    isFavorite: joi.boolean(),
-    comments: [joi.string()],
-    size: joi.number().required(),
-    url: joi.string(),
+    tags: joi.array().items(joi.string()).optional(),
+    person: joi.array().items(joi.string()).optional(),
+    isFavorite: joi.boolean().default(false),
+    comments: joi.array().items(joi.string()).optional(),
 });
 
 const imageUpload = async(req,res,next)=>{
     try {
         const files = req.files // file type input
+        console.log("files: ", files);
+        console.log("req.file:", req.file);   // in case it's treating it as single
+        console.log("req.headers['content-type']:", req.headers['content-type']);
         const acceptedName = ["jpeg", "png", "jpg", "webp",]; // accepted file extentions
-        
+        console.log(req.body)
+        Object.keys(req.body).forEach(key => {
+            if(req.body[key] && typeof req.body[key] === "string"){
+                if(req.body[key].startsWith("[") || req.body[key].startsWith("{")){
+                    try{
+                        req.body[key] = JSON.parse(req.body[key]); 
+                        console.log(req.body[key]);
+                    }
+                    catch(e){}
+                }
+                else if( req.body[key] === "true") 
+                    req.body[key] = true;
+                else if (req.body[key] === "false")
+                     req.body[key] = false;
+            }
+        })
         //validate image
         const { value, error } = imageSchemaValidate.validate(req.body);
         if(error) 
@@ -37,14 +53,21 @@ const imageUpload = async(req,res,next)=>{
                 const stats = fs.statSync(file.path);
                 fs.unlinkSync(file.path);
 
-                return {url: cloudUpload.secure_url, size: stats.size, name: file.originalname };
+                return {
+                    url: cloudUpload.secure_url, 
+                    size: stats.size, 
+                    name: file.originalname,
+                    cloudinaryId: cloudUpload.public_id
+                };
             })
         )
         const imageDocs = uploadCloudImages.map((img)=>({
             ...value,
             size: img.size,
             url: img.url,
-            name: img.name
+            name: img.name,
+            cloudinaryId: img.cloudinaryId
+            
         }))
         //upload to database
         const uploadedImage = await ImageModel.insertMany(imageDocs);
@@ -53,7 +76,10 @@ const imageUpload = async(req,res,next)=>{
             throw createError("Server Error: Image Upload Failed", 500)
         }
         
-        return res.status(201).json({message: "Image details uploaded to database successfully"});
+        return res.status(201).json({
+            message: "Image details uploaded to database successfully",
+            images: uploadedImage
+        });
 
     } catch (error) {
         next(error);
@@ -61,17 +87,17 @@ const imageUpload = async(req,res,next)=>{
 }
 
 const getImages = async(req, res, next)=>{
-    const {albumId} = req.params;
+    const { albumId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     try {
         //const {id} = req.params;
         const findImage = await ImageModel.find({albumId}).skip(skip).limit(limit);
-        const totalImages = await ImageModel.countDocuments()
+        const totalImages = await ImageModel.countDocuments({albumId})
         if(!findImage) throw createError("Image not found", 404);
         return res.status(200).json({message: "Image found successfully", 
-            image: findImage,
+            images: findImage,
             pagination: {
                 totalItems: totalImages,
                 totalPages: Math.ceil(totalImages/limit),
@@ -86,7 +112,7 @@ const getImages = async(req, res, next)=>{
 const getParticularImage = async(req, res, next)=>{
     
     try {
-        const {imageId} = req.params;
+        const { imageId } = req.params;
         const findImage = await ImageModel.findById(imageId);
         if(!findImage) throw createError("Image not found", 404);
         return res.status(200).json({message: "Image found successfully", image: findImage});
@@ -96,13 +122,13 @@ const getParticularImage = async(req, res, next)=>{
 }
 
 const getFavorites = async(req, res, next)=>{
-    const {albumId} = req.params;
+    const { albumId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
     const skip = (page - 1) * limit;
     try {
         const findImage = await ImageModel.find({albumId, isFavorite: true}).skip(skip).limit(limit);
-        const totalImages = await ImageModel.countDocuments()
+        const totalImages = await ImageModel.countDocuments({ albumId, isFavorite: true })
         if(!findImage) throw createError("Image not found", 404);
         return res.status(200).json({message: "Favorite Image found successfully", 
             image: findImage,
@@ -118,16 +144,17 @@ const getFavorites = async(req, res, next)=>{
 }
 
 const imageFilter = async(req, res, next)=>{
-    const filter = {};
+    const { albumId } = req.params;
+    const filter = { albumId };
     if(req.query.tags) filter.tags = {$in: [req.query.tags]}
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
     const skip = (page - 1) * limit;
     try {
         const findImage = await ImageModel.find(filter).skip(skip).limit(limit);
-        const totalImages = await ImageModel.countDocuments()
+        const totalImages = await ImageModel.countDocuments(filter)
         if(!findImage) throw createError("Image not found", 404);
-        return res.status(200).json({message: "Favorite Image found successfully", 
+        return res.status(200).json({message: "Images filtered successfully", 
             image: findImage,
             pagination: {
                 totalItems: totalImages,
@@ -143,6 +170,15 @@ const imageFilter = async(req, res, next)=>{
 const deleteImages = async(req, res, next)=>{
     try {
         const {imageId} = req.params;
+
+        const image = await ImageModel.findById(imageId);
+        if(!image) {
+            throw createError("Image not found", 404);
+        }
+
+        if(image.cloudinaryId) {
+            await cloudinary.uploader.destroy(image.cloudinaryId);
+        }
         
         const deletedImages =  await ImageModel.findByIdAndDelete(imageId);
 

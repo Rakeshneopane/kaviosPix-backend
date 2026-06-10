@@ -7,7 +7,7 @@ const { verifyMiddleware } = require("../middleware/auth.middleware");
 const imageRouter = express.Router();
 
 //to uplaod images
-imageRouter.post("/upload", verifyMiddleware, upload.array("uploaded-image", 15), imageUpload);
+imageRouter.post("/upload", verifyMiddleware, upload.array("image", 15), imageUpload);
 
 // albumId se favorites done
 imageRouter.get("/:albumId/images/favorites", verifyMiddleware, getFavorites);
@@ -29,7 +29,7 @@ imageRouter.put("/:imageId/toggle", verifyMiddleware, toggleFavorite);
 imageRouter.patch("/:imageId/comment", verifyMiddleware, addComment);
 
 // delete image done
-imageRouter.delete("/:imageId", verifyMiddleware, deleteImages);
+imageRouter.delete("/delete/:imageId", verifyMiddleware, deleteImages);
 
 
 module.exports = { imageRouter }
