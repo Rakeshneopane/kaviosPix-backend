@@ -73,7 +73,7 @@ router.get("/google/callback", async(req,res, next)=>{
         res.cookie("jwt_token", jwtToken,{
             httpOnly: true,
             secure: isProduction,
-            sameSite: isProduction? "strict" : "lax",
+            sameSite: "none",
             maxAge: 60*60*1000
         })
         return res.redirect(`${process.env.FRONTEND_URL}/v1/profile/google`);       
@@ -92,20 +92,13 @@ router.get("/me", verifyMiddleware, async(req,res,next)=>{
         next(error);
     }
 })
-// router.get("/initialise", verifyMiddleware, async(req,res,next)=>{
-//     try {
-//         const user = req.user.email;
-//         const existingUser = await UserModel.find({})
-//     } catch (error) {
-//         next(error);
-//     }
-// })
+
 router.post("/logout", verifyMiddleware, async(req,res,next)=>{
     try {
         res.clearCookie("jwt_token", {
             httpOnly: true,
             secure: isProduction,
-            sameSite: isProduction? "strict" : "lax",
+            sameSite: "none",
         });
 
         return res.json({message: " Logout successful "});
