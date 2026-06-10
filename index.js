@@ -25,6 +25,9 @@ app.get("/", (req,res)=>{
     res.send("Welcome to the Image APp API");
 })
 
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 app.use("/auth", router);
 
 app.use("/album", albumRouter);
