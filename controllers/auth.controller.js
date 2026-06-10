@@ -39,13 +39,6 @@ router.get("/google/callback", async(req,res, next)=>{
 
         const accessToken = tokenResponse.data.access_token;
 
-        // res.cookie("access_token", accessToken, {
-        //     httpOnly: true,
-        //     secure: true,
-        //     sameSite: "strict"
-        // });
-
-
         const userInfo = await axios.get("https://www.googleapis.com/oauth2/v2/userinfo",
             {
             headers: {
