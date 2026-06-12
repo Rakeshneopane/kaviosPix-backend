@@ -7,7 +7,7 @@ const { verifyMiddleware } = require("../middleware/auth.middleware");
 const imageRouter = express.Router();
 
 //to uplaod images
-imageRouter.post("/upload", verifyMiddleware, upload.array("image", 15), imageUpload);
+imageRouter.post("/upload", verifyMiddleware, upload.array("images", 15), imageUpload);
 
 // albumId se favorites done
 imageRouter.get("/:albumId/images/favorites", verifyMiddleware, getFavorites);

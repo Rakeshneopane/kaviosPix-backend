@@ -11,6 +11,10 @@ const router = express.Router();
 
 const isProduction = process.env.NODE_ENV === "production";
 
+const FRONTEND_URL = process.env.NODE_ENV === 'production'
+  ? 'https://image-app-frontend-mu.vercel.app'
+  : 'http://localhost:5173';
+
 router.get("/google", (req,res, next)=>{
     try {
         const googleUrl =  `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${process.env.GOOGLE_CALLBACK_URL}&scope=email profile&response_type=code`;
@@ -22,7 +26,7 @@ router.get("/google", (req,res, next)=>{
 });
 
 router.get("/google/callback", async(req,res, next)=>{
-     console.log("FRONTEND_URL:", process.env.FRONTEND_URL); 
+     console.log("FRONTEND_URL:", FRONTEND_URL); 
     try {
         const {code} = req.query;
         if(!code) throw createError("Authorization is not provided.",400);
@@ -66,10 +70,10 @@ router.get("/google/callback", async(req,res, next)=>{
         res.cookie("jwt_token", jwtToken,{
             httpOnly: true,
             secure: isProduction,
-            sameSite: "none",
+            sameSite: isProduction ? "none" : "lax",
             maxAge: 60*60*1000
         })
-        return res.redirect(`${process.env.FRONTEND_URL}/v1/profile/google`);       
+        return res.redirect(`${FRONTEND_URL}/v1/profile/google`);       
     } catch (error) {
         next(error);
     }
@@ -91,7 +95,7 @@ router.post("/logout", verifyMiddleware, async(req,res,next)=>{
         res.clearCookie("jwt_token", {
             httpOnly: true,
             secure: isProduction,
-            sameSite: "none",
+            sameSite: isProduction ? "none" : "lax",
         });
 
         return res.json({message: " Logout successful "});
