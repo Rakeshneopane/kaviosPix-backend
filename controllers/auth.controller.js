@@ -64,20 +64,67 @@ router.get("/google/callback", async(req,res, next)=>{
         const jwtToken = jwt.sign(
             {_id}, 
             process.env.JWT_SECRET_KEY, 
-            {expiresIn: '1h'}
+            {expiresIn: '15m'}
         );
 
-        res.cookie("jwt_token", jwtToken,{
+        const refreshJWTToken = jwt.sign(
+            {_id}, 
+            process.env.JWT_REFRESH_SECRET_KEY, 
+            {expiresIn: '7d'}
+        );
+
+        await UserModel.findByIdAndUpdate(_id,{
+            refreshToken: refreshJWTToken
+        })
+
+        res.cookie("jwt_token", jwtToken, {  // access token
             httpOnly: true,
             secure: isProduction,
             sameSite: isProduction ? "none" : "lax",
-            maxAge: 60*60*1000
-        })
+            maxAge: 15 * 60 * 1000  // 15 minutes
+        });
+        res.cookie("refresh_token", refreshJWTToken, {  // refresh token
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000  // 7 days
+        });
         return res.redirect(`${FRONTEND_URL}/v1/profile/google`);       
     } catch (error) {
         next(error);
     }
 });
+
+router.post("/refresh", async(req, res, next)=>{
+    try {
+        const refreshToken = req.cookies?.refresh_token; 
+        if (!refreshToken) throw createError("No refresh token", 401);
+
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET_KEY);
+        
+        // verify token exists in DB
+        const user = await UserModel.findById(decoded._id);
+        if (!user || user.refreshToken !== refreshToken)
+            throw createError("Invalid refresh token", 403);
+
+        const accessToken = jwt.sign(
+            { _id: decoded._id },
+            process.env.JWT_SECRET_KEY,
+            { expiresIn: '15m' }
+        );
+
+        res.cookie("jwt_token", accessToken, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+            maxAge: 15 * 60 * 1000
+        });
+
+        return res.json({ message: "Token refreshed successfully" });
+    } catch (error) {
+        next(error);
+    }
+})
 
 router.get("/me", verifyMiddleware, async(req,res,next)=>{
     try {
@@ -92,7 +139,15 @@ router.get("/me", verifyMiddleware, async(req,res,next)=>{
 
 router.post("/logout", verifyMiddleware, async(req,res,next)=>{
     try {
+        await UserModel.findByIdAndUpdate(req.user._id, { refreshToken: null }); 
+        
         res.clearCookie("jwt_token", {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+        });
+
+        res.clearCookie("refresh_token", {
             httpOnly: true,
             secure: isProduction,
             sameSite: isProduction ? "none" : "lax",

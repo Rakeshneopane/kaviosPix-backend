@@ -10,6 +10,10 @@ const UserSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
+    },
+    refreshToken: {
+        type: String,
+        default: null
     }
 },{
     timestamps: true

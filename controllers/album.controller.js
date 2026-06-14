@@ -2,7 +2,7 @@ const express = require("express");
 const { createError } = require("../utils/createError");
 const { AlbumModel } = require("../models/album.model");
 const { ImageModel } =  require("../models/image.model");
-
+const { UserModel } = require("../models/user.model");
 const joi = require("joi");
 
 const ablumSchemaVerify = joi.object({
@@ -29,6 +29,7 @@ const createAlbum = async(req, res, next)=>{
         if(error){
             throw createError(error.details[0].message, 400);
         }
+
         const newAlbum = await new AlbumModel(value).save();
         // if(!newAlbum){
         //      throw createError("Service not done by database.", 500);
@@ -114,15 +115,20 @@ const getAlbums = async(req,res, next)=>{
     const ownerId = user._id;
     try {
         const [albumsData, totalAlbum] = await Promise.allSettled([
-            AlbumModel.find({ownerId}).skip(skip).limit(limit), 
-            AlbumModel.countDocuments({ownerId})
+            AlbumModel.find({
+                $or: [{ ownerId }, { sharedUserIds: ownerId }]}).skip(skip).limit(limit), 
+            AlbumModel.countDocuments({
+                $or: [{ ownerId }, { sharedUserIds: ownerId }]
+            })
         ]);
         const albums = albumsData.status === "fulfilled" ? albumsData.value : [];
         const total = totalAlbum.status === "fulfilled" ? totalAlbum.value: 0;
 
-        if(albums.length === 0) {
+        const ownedCount = await AlbumModel.countDocuments({ ownerId });
+
+        if(ownedCount === 0) {
             const defaultAlbum = await AlbumModel.create({
-                name: "default", // changed from default Album
+                name: "default",
                 description: "none",
                 ownerId,
                 sharedUserIds: [],
@@ -157,9 +163,12 @@ const getParticularAlbum = async(req,res, next)=>{
     const {id} = req.params;
     const ownerId = req.user._id;
     try {
-        const albumData = await AlbumModel.findOne({_id: id, ownerId});
+        const albumData = await AlbumModel.findOne({
+            _id: id, 
+            $or: [{ ownerId }, { sharedUserIds: ownerId }]
+        });
         if(!albumData) {
-            throw createError("Album not found in the DB.",404);
+            throw createError("Album not found or unauthorized.",404);
         }
         return res.status(200).json({
             success: true,
@@ -175,20 +184,30 @@ const shareAlbums = async(req, res, next)=>{
     try {
         const {id} = req.params;
         const ownerId = req.user._id;
+        
         const findAlbum = await AlbumModel.findOne({_id: id, ownerId});
         if(!findAlbum) {
             throw createError("Album not found in the DB.",404);
         }
         // array from frontend
-        const sharedUserIds = req.body.sharedUserIds;
+        const { emails } = req.body;
+        if (!emails || !Array.isArray(emails) || emails.length === 0)
+            throw createError("Emails array is required", 400);
 
-        if(!sharedUserIds || !Array.isArray(sharedUserIds)) {
-            throw createError("sharedUserIds must be a non-empty array", 400);
-        }
+        const usersToShare = await UserModel.find({ email: { $in: emails } });
+        if (usersToShare.length === 0) 
+            throw createError("No user found with those emails", 404);
+
+        const userIds = usersToShare
+            .filter(u => u._id.toString() !== ownerId.toString())
+            .map(u => u._id);
+
+        if (userIds.length === 0)
+            throw createError("You cannot share an album with yourself", 400);
 
         const sharedAblum = await AlbumModel.findByIdAndUpdate(
             id, 
-            {$addToSet: {sharedUserIds: {$each: sharedUserIds}}}, 
+            {$addToSet: {sharedUserIds: {$each: userIds }}}, 
             {new: true}
         );
         return res.status(200).json({
