@@ -137,10 +137,27 @@ router.get("/me", verifyMiddleware, async(req,res,next)=>{
     }
 })
 
-router.post("/logout", verifyMiddleware, async(req,res,next)=>{
+router.post("/logout", async(req,res,next)=>{
     try {
-        await UserModel.findByIdAndUpdate(req.user._id, { refreshToken: null }); 
-        
+        const token = req.cookies?.jwt_token;
+        if (token) {
+            try {
+                const verified = jwt.verify(token, process.env.JWT_SECRET_KEY);
+                await UserModel.findByIdAndUpdate(verified._id, { refreshToken: null });
+            } catch (err) {
+                // Access token expired/invalid, try refresh token
+                const refreshToken = req.cookies?.refresh_token;
+                if (refreshToken) {
+                    try {
+                        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET_KEY);
+                        await UserModel.findByIdAndUpdate(decoded._id, { refreshToken: null });
+                    } catch (rErr) {}
+                }
+            }
+        }
+    } catch (error) {
+        // Ignore DB update errors during logout
+    } finally {
         res.clearCookie("jwt_token", {
             httpOnly: true,
             secure: isProduction,
@@ -154,8 +171,6 @@ router.post("/logout", verifyMiddleware, async(req,res,next)=>{
         });
 
         return res.json({message: " Logout successful "});
-    } catch (error) {
-        next(error);
     }
 })
 module.exports = router;

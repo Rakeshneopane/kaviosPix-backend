@@ -1,6 +1,7 @@
 const express = require("express")
 const { createError } = require("../utils/createError");
 const { ImageModel } = require("../models/image.model");
+const { AlbumModel } = require("../models/album.model");
 const joi = require("joi");
 const fs = require("fs");
 const path = require("path");
@@ -18,7 +19,10 @@ const imageSchemaValidate = joi.object({
 
 const imageUpload = async(req,res,next)=>{
     try {
-        const files = req.files // file type input
+        const files = req.files; // file type input
+        if (!files || !Array.isArray(files) || files.length === 0) {
+            throw createError("Client error: No files provided for upload", 400);
+        }
         console.log("files: ", files);
         console.log("req.file:", req.file);   // in case it's treating it as single
         console.log("req.headers['content-type']:", req.headers['content-type']);
@@ -43,6 +47,15 @@ const imageUpload = async(req,res,next)=>{
         const { value, error } = imageSchemaValidate.validate(req.body);
         if(error) 
             throw createError( error.details[0].message, 400);
+
+        // Ownership check: User must own the destination album
+        const album = await AlbumModel.findById(value.albumId);
+        if (!album) {
+            throw createError("Album not found", 404);
+        }
+        if (album.ownerId.toString() !== req.user._id.toString()) {
+            throw createError("Unauthorized: You do not own this album", 403);
+        }
 
         const uploadCloudImages = await Promise.all(
             files.map(async (file)=>{
@@ -89,10 +102,15 @@ const imageUpload = async(req,res,next)=>{
 const getImages = async(req, res, next)=>{
     const { albumId } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 100;
     const skip = (page - 1) * limit;
     try {
-        //const {id} = req.params;
+        const album = await AlbumModel.findById(albumId);
+        if (!album) throw createError("Album not found", 404);
+        if (album.ownerId.toString() !== req.user._id.toString() && !album.sharedUserIds.map(id => id.toString()).includes(req.user._id.toString())) {
+            throw createError("Unauthorized: You do not have access to this album", 403);
+        }
+
         const findImage = await ImageModel.find({albumId}).skip(skip).limit(limit);
         const totalImages = await ImageModel.countDocuments({albumId})
         if(!findImage) throw createError("Image not found", 404);
@@ -110,11 +128,17 @@ const getImages = async(req, res, next)=>{
 }
 
 const getParticularImage = async(req, res, next)=>{
-    
     try {
         const { imageId } = req.params;
         const findImage = await ImageModel.findById(imageId);
         if(!findImage) throw createError("Image not found", 404);
+
+        const album = await AlbumModel.findById(findImage.albumId);
+        if (!album) throw createError("Album not found", 404);
+        if (album.ownerId.toString() !== req.user._id.toString() && !album.sharedUserIds.map(id => id.toString()).includes(req.user._id.toString())) {
+            throw createError("Unauthorized: You do not have access to this image", 403);
+        }
+
         return res.status(200).json({message: "Image found successfully", image: findImage});
     } catch (error) {
         next(error);
@@ -124,9 +148,15 @@ const getParticularImage = async(req, res, next)=>{
 const getFavorites = async(req, res, next)=>{
     const { albumId } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 5;
+    const limit = parseInt(req.query.limit) || 100;
     const skip = (page - 1) * limit;
     try {
+        const album = await AlbumModel.findById(albumId);
+        if (!album) throw createError("Album not found", 404);
+        if (album.ownerId.toString() !== req.user._id.toString() && !album.sharedUserIds.map(id => id.toString()).includes(req.user._id.toString())) {
+            throw createError("Unauthorized: You do not have access to this album", 403);
+        }
+
         const findImage = await ImageModel.find({albumId, isFavorite: true}).skip(skip).limit(limit);
         const totalImages = await ImageModel.countDocuments({ albumId, isFavorite: true })
         if(!findImage) throw createError("Image not found", 404);
@@ -148,9 +178,15 @@ const imageFilter = async(req, res, next)=>{
     const filter = { albumId };
     if(req.query.tags) filter.tags = {$in: [req.query.tags]}
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 5;
+    const limit = parseInt(req.query.limit) || 100;
     const skip = (page - 1) * limit;
     try {
+        const album = await AlbumModel.findById(albumId);
+        if (!album) throw createError("Album not found", 404);
+        if (album.ownerId.toString() !== req.user._id.toString() && !album.sharedUserIds.map(id => id.toString()).includes(req.user._id.toString())) {
+            throw createError("Unauthorized: You do not have access to this album", 403);
+        }
+
         const findImage = await ImageModel.find(filter).skip(skip).limit(limit);
         const totalImages = await ImageModel.countDocuments(filter)
         if(!findImage) throw createError("Image not found", 404);
@@ -174,6 +210,14 @@ const deleteImages = async(req, res, next)=>{
         const image = await ImageModel.findById(imageId);
         if(!image) {
             throw createError("Image not found", 404);
+        }
+
+        const album = await AlbumModel.findById(image.albumId);
+        if (!album) {
+            throw createError("Album not found", 404);
+        }
+        if (album.ownerId.toString() !== req.user._id.toString()) {
+            throw createError("Unauthorized: You do not own the album containing this image", 403);
         }
 
         if(image.cloudinaryId) {
@@ -200,6 +244,12 @@ const toggleFavorite = async(req, res, next)=>{
         const findImage =  await ImageModel.findById(imageId);
         if(!findImage ) throw createError("Server Error: Image not found.",404);
 
+        const album = await AlbumModel.findById(findImage.albumId);
+        if (!album) throw createError("Album not found", 404);
+        if (album.ownerId.toString() !== req.user._id.toString() && !album.sharedUserIds.map(id => id.toString()).includes(req.user._id.toString())) {
+            throw createError("Unauthorized: You do not have access to this image", 403);
+        }
+
         const toggleImage = await ImageModel.findByIdAndUpdate(
             imageId, 
             {$set: {isFavorite: !findImage.isFavorite}}, 
@@ -220,6 +270,12 @@ const addComment = async(req, res, next)=>{
         const findImage =  await ImageModel.findById(imageId);
 
          if(!findImage ) throw createError("Server Error: Image not found.",404);
+
+        const album = await AlbumModel.findById(findImage.albumId);
+        if (!album) throw createError("Album not found", 404);
+        if (album.ownerId.toString() !== req.user._id.toString() && !album.sharedUserIds.map(id => id.toString()).includes(req.user._id.toString())) {
+            throw createError("Unauthorized: You do not have access to this image", 403);
+        }
         
         const addedComments = await ImageModel.findByIdAndUpdate(
             imageId, 

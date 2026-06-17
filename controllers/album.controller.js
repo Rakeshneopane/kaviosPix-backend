@@ -108,9 +108,9 @@ const deleteAlbum = async(req,res,next)=>{
 
 const getAlbums = async(req,res, next)=>{
     const user = req.user;
-    console.log(user);
-    const page = parseInt(req.query.page) ?? 1;
-    const limit = parseInt(req.query.limit) ?? 5;
+    //console.log(user);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100;
     const skip = (page - 1) * limit;
     const ownerId = user._id;
     try {
@@ -128,8 +128,8 @@ const getAlbums = async(req,res, next)=>{
 
         if(ownedCount === 0) {
             const defaultAlbum = await AlbumModel.create({
-                name: "default",
-                description: "none",
+                name: "Default Album",
+                description: "My default album",
                 ownerId,
                 sharedUserIds: [],
                 isDefault: true, 
@@ -138,10 +138,15 @@ const getAlbums = async(req,res, next)=>{
             if(!defaultAlbum) 
                 throw createError("Unable to create default album", 401);
 
-            return res.status(201).json({
+            return res.status(200).json({
                 success: true, 
                 message: "Default album created", 
-                album: defaultAlbum,
+                albums: [defaultAlbum],
+                pagination: {
+                    totalItems: 1,
+                    totalPages: 1,
+                    currentPage: 1
+                }
             })
         }
         return res.status(200).json({

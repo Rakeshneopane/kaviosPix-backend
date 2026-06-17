@@ -4,9 +4,6 @@ const { createError } = require("../utils/createError");
 const verifyMiddleware = (req,res, next) =>{
     try {
         const token = req.cookies.jwt_token;
-        // if(!verifyToken)
-        //     return res.status(401).json({message: "Access Denied: No Token in the headers."});
-        // const token = verifyToken && verifyToken.split(" ")[1];
         if(!token) throw createError("Access Denied: No Token Provided.",401);
     
         const verified = jwt.verify(token, process.env.JWT_SECRET_KEY);
@@ -14,7 +11,11 @@ const verifyMiddleware = (req,res, next) =>{
 
         next();
     } catch (error) {
-        next(error)
+        if (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError") {
+            next(createError("Access Denied: Invalid or expired token.", 401));
+        } else {
+            next(error);
+        }
     }
 }
 module.exports = { verifyMiddleware };
