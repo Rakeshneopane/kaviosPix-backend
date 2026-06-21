@@ -23,17 +23,14 @@ const imageUpload = async(req,res,next)=>{
         if (!files || !Array.isArray(files) || files.length === 0) {
             throw createError("Client error: No files provided for upload", 400);
         }
-        console.log("files: ", files);
-        console.log("req.file:", req.file);   // in case it's treating it as single
-        console.log("req.headers['content-type']:", req.headers['content-type']);
         const acceptedName = ["jpeg", "png", "jpg", "webp",]; // accepted file extentions
-        console.log(req.body)
+        
         Object.keys(req.body).forEach(key => {
             if(req.body[key] && typeof req.body[key] === "string"){
                 if(req.body[key].startsWith("[") || req.body[key].startsWith("{")){
                     try{
                         req.body[key] = JSON.parse(req.body[key]); 
-                        console.log(req.body[key]);
+                        
                     }
                     catch(e){}
                 }
@@ -62,13 +59,19 @@ const imageUpload = async(req,res,next)=>{
                 const ext = path.extname(file.originalname).slice(1).toLowerCase();
                 if(!acceptedName.includes(ext))
                     throw createError("Client error: File extention not match. Should be jpeg,jpg,png or webp", 400);
-                const cloudUpload = await cloudinary.uploader.upload(file.path, {folder: "kavios/upload"});
-                const stats = fs.statSync(file.path);
+                const cloudUpload = await cloudinary.uploader.upload(file.path, {
+                    folder: "kavios/upload",
+                    transformation: [
+                        { width: 1920, height: 1920, crop: "limit" },
+                        { quality: "auto:good" },                      
+                        { fetch_format: "auto" }                       
+                    ]
+                });
                 fs.unlinkSync(file.path);
 
                 return {
                     url: cloudUpload.secure_url, 
-                    size: stats.size, 
+                    size: cloudUpload.bytes, 
                     name: file.originalname,
                     cloudinaryId: cloudUpload.public_id
                 };

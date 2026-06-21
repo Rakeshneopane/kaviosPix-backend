@@ -17,8 +17,8 @@ const createAlbum = async(req, res, next)=>{
         const { name, description, sharedUserIds } = req.body;
         // taking from middleware from  
         const ownerId = req.user._id;
-        if(!name || !ownerId){
-            throw createError("Name or ownerId are required.", 400);
+        if(!name){
+            throw createError("Name is required.", 400);
         }
         const { value, error } = ablumSchemaVerify.validate({
             name, 
@@ -53,8 +53,8 @@ const updateAlbum = async(req,res,next)=>{
         if(!existingAlbum) throw createError("Album not found or unauthorized", 403); 
         
         const { name, description, sharedUserIds } = req.body;
-        if(!name || !id){
-            throw createError("Name or ownerId are required.", 400);
+        if(!name ){
+            throw createError("Name is required.", 400);
         }
    
         const { value, error } = ablumSchemaVerify.validate({name, description, ownerId, sharedUserIds}); 
@@ -88,13 +88,13 @@ const deleteAlbum = async(req,res,next)=>{
         if(existingAlbum.isDefault)
             throw createError("Cannot delete default album. Create another album first.", 400);
 
-        const imagesDeleted =  await ImageModel.deleteMany({albumId: id });
+        
         const deletedAlbum = await AlbumModel.findByIdAndDelete(id);
-
         if(!deletedAlbum ) {
             throw createError("Server Error: Album Deletion failed.",500);
         }
-        
+
+        const imagesDeleted =  await ImageModel.deleteMany({albumId: id });
         return res.status(200).json({
             success: true,
             message: "Album deleted successffully", 
@@ -108,22 +108,11 @@ const deleteAlbum = async(req,res,next)=>{
 
 const getAlbums = async(req,res, next)=>{
     const user = req.user;
-    //console.log(user);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 100;
     const skip = (page - 1) * limit;
     const ownerId = user._id;
     try {
-        const [albumsData, totalAlbum] = await Promise.allSettled([
-            AlbumModel.find({
-                $or: [{ ownerId }, { sharedUserIds: ownerId }]}).skip(skip).limit(limit), 
-            AlbumModel.countDocuments({
-                $or: [{ ownerId }, { sharedUserIds: ownerId }]
-            })
-        ]);
-        const albums = albumsData.status === "fulfilled" ? albumsData.value : [];
-        const total = totalAlbum.status === "fulfilled" ? totalAlbum.value: 0;
-
         const ownedCount = await AlbumModel.countDocuments({ ownerId });
 
         if(ownedCount === 0) {
@@ -149,6 +138,17 @@ const getAlbums = async(req,res, next)=>{
                 }
             })
         }
+
+        const [albumsData, totalAlbum] = await Promise.allSettled([
+            AlbumModel.find({
+                $or: [{ ownerId }, { sharedUserIds: ownerId }]}).skip(skip).limit(limit), 
+            AlbumModel.countDocuments({
+                $or: [{ ownerId }, { sharedUserIds: ownerId }]
+            })
+        ]);
+        const albums = albumsData.status === "fulfilled" ? albumsData.value : [];
+        const total = totalAlbum.status === "fulfilled" ? totalAlbum.value: 0;
+
         return res.status(200).json({
             success: true, 
             message: "Fetched the ablums sucessfully",
