@@ -6,9 +6,9 @@
 
 **Backend API (Render)**: https://imageapp-backend.onrender.com/
 
-**Frontend Repository**: [https://github.com/Rakeshneopane/kaviosPix-frontend]
+**Frontend Repository**: [KaviosPix Frontend](https://github.com/Rakeshneopane/kaviosPix-frontend)
 
-**Backend Repository**: [https://github.com/Rakeshneopane/kaviosPix-backend]
+**Backend Repository**: [KaviosPix Backend](https://github.com/Rakeshneopane/kaviosPix-backend)
 
 ---
 
